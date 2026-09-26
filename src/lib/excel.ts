@@ -13,6 +13,36 @@ export function exportToExcel<T extends Record<string, unknown>>(
   XLSX.writeFile(wb, `${fileName}-${stamp}.xlsx`);
 }
 
+/** A single named sheet to include in a multi-sheet workbook export. */
+export interface SheetSpec {
+  name: string;
+  rows: Record<string, unknown>[];
+}
+
+/**
+ * Export multiple named sheets into a single .xlsx workbook (client-side download).
+ * Empty sheets are still written (with a placeholder row) so the tab is visible.
+ */
+export function exportSheetsToExcel(sheets: SheetSpec[], fileName: string) {
+  const wb = XLSX.utils.book_new();
+  const used = new Set<string>();
+  for (const sheet of sheets) {
+    // Excel sheet names must be <=31 chars and unique within a workbook.
+    let name = (sheet.name || 'Sheet').slice(0, 31);
+    let n = 2;
+    while (used.has(name.toLowerCase())) {
+      const suffix = ` (${n++})`;
+      name = `${sheet.name.slice(0, 31 - suffix.length)}${suffix}`;
+    }
+    used.add(name.toLowerCase());
+    const rows = sheet.rows.length ? sheet.rows : [{ '(kosong)': 'Tidak ada data' }];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, name);
+  }
+  const stamp = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `${fileName}-${stamp}.xlsx`);
+}
+
 /** Parse the first sheet of an uploaded Excel/CSV file into JSON rows. */
 export async function parseExcel<T = Record<string, unknown>>(file: File): Promise<T[]> {
   const buf = await file.arrayBuffer();
